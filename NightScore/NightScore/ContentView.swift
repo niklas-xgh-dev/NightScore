@@ -10,7 +10,7 @@ struct ContentView: View {
                 ProgressView()
                     .scaleEffect(2)
                     .padding()
-                Text("Generating Sleep Score...")
+                Text("Generating Sleep Score..")
             } else {
                 // Score display circle
                 ZStack {
