@@ -74,3 +74,6 @@ ENV/
 .vscode/
 *.swp
 *.swo
+
+NightScore/NightScore.xcodeproj/*
+NightScore/NightScore.xcodeproj
