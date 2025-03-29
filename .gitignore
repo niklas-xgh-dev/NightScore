@@ -75,5 +75,9 @@ ENV/
 *.swp
 *.swo
 
+## User settings
+xcuserdata/
+*.xcuserstate
+UserInterfaceState.xcuserstate
 NightScore/NightScore.xcodeproj/*
 NightScore/NightScore.xcodeproj
