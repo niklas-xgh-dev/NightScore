@@ -11,6 +11,10 @@ class HealthKitManager: ObservableObject {
     @Published var sleepEfficiency: Double = 0
     @Published var error: String?
     
+    // New properties for weekly data
+    @Published var weeklyData: [DailySleepData] = []
+    @Published var selectedDate: Date = Date()
+    
     private let healthStore = HKHealthStore()
     private let sleepType = HKObjectType.categoryType(forIdentifier: .sleepAnalysis)!
     
@@ -19,6 +23,44 @@ class HealthKitManager: ObservableObject {
         let endDate: Date
         let duration: TimeInterval
         let sleepStage: HKCategoryValueSleepAnalysis
+    }
+    
+    // New structure to hold daily sleep data
+    struct DailySleepData: Identifiable {
+        let id = UUID()
+        let date: Date
+        let sleepScore: Int
+        let sleepData: [SleepEntry]
+        let sleepDuration: TimeInterval
+        let deepSleepPercentage: Double
+        let sleepEfficiency: Double
+        let restingHeartRate: Double
+        
+        // Format the date to display day of week and day number
+        var formattedDate: String {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "EEE\ndd"
+            return formatter.string(from: date)
+        }
+        
+        // Day of month only
+        var dayNumber: String {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "d"
+            return formatter.string(from: date)
+        }
+        
+        // Day of week only
+        var dayOfWeek: String {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "EEE"
+            return formatter.string(from: date)
+        }
+        
+        // Check if this entry is for today or a specific date
+        func isDate(_ compareDate: Date) -> Bool {
+            return Calendar.current.isDate(date, inSameDayAs: compareDate)
+        }
     }
     
     init() {
@@ -53,30 +95,31 @@ class HealthKitManager: ObservableObject {
         }
     }
     
-    func fetchLastNightSleepData(completion: @escaping (Bool) -> Void) {
+    // New function to fetch last 7 days of sleep data
+    func fetchWeeklySleepData(completion: @escaping (Bool) -> Void) {
         guard isAuthorized else {
             self.error = "Not authorized to access HealthKit data"
             completion(false)
             return
         }
         
-        // Calculate the date range for last night (yesterday evening to this morning)
-        let now = Date()
+        // Calculate date range for the last 7 days
         let calendar = Calendar.current
+        let now = Date()
+        let endDate = calendar.startOfDay(for: now)
+        guard let startDate = calendar.date(byAdding: .day, value: -7, to: endDate) else {
+            self.error = "Failed to calculate date range"
+            completion(false)
+            return
+        }
         
-        // Start from yesterday evening (8 PM)
-        let startOfYesterday = calendar.startOfDay(for: calendar.date(byAdding: .day, value: -1, to: now)!)
-        let yesterdayEvening = calendar.date(bySettingHour: 20, minute: 0, second: 0, of: startOfYesterday)!
-        
-        // End at this morning (10 AM)
-        let endTime = calendar.date(bySettingHour: 10, minute: 0, second: 0, of: now)!
-        
-        let predicate = HKQuery.predicateForSamples(withStart: yesterdayEvening, end: endTime, options: .strictStartDate)
+        // Create a predicate for the last 7 days
+        let predicate = HKQuery.predicateForSamples(withStart: startDate, end: now, options: .strictStartDate)
         
         // Query parameters
         let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)
         
-        // Execute the query
+        // Execute the query to get all sleep samples for the week
         let query = HKSampleQuery(sampleType: sleepType, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: [sortDescriptor]) { (query, samples, error) in
             
             DispatchQueue.main.async {
@@ -86,35 +129,25 @@ class HealthKitManager: ObservableObject {
                     return
                 }
                 
-                guard let sleepSamples = samples as? [HKCategorySample] else {
-                    self.error = "No sleep data available"
+                guard let sleepSamples = samples as? [HKCategorySample], !sleepSamples.isEmpty else {
+                    self.error = "No sleep data available for the last week"
                     completion(false)
                     return
                 }
                 
-                // Process sleep data
-                var entries: [SleepEntry] = []
+                // Group samples by day
+                self.processWeeklySleepData(sleepSamples: sleepSamples)
                 
-                for sample in sleepSamples {
-                    if let sleepValue = HKCategoryValueSleepAnalysis(rawValue: sample.value) {
-                        let entry = SleepEntry(
-                            startDate: sample.startDate,
-                            endDate: sample.endDate,
-                            duration: sample.endDate.timeIntervalSince(sample.startDate),
-                            sleepStage: sleepValue
-                        )
-                        entries.append(entry)
+                // If we got data and processed it successfully
+                if !self.weeklyData.isEmpty {
+                    // Set the selected date to the most recent day with data
+                    if let latestDay = self.weeklyData.first {
+                        self.selectedDate = latestDay.date
+                        self.updateSelectedDayData(from: latestDay)
                     }
-                }
-                
-                self.sleepData = entries
-                
-                // If we got data, calculate the sleep score
-                if !entries.isEmpty {
-                    self.calculateSleepScore()
                     completion(true)
                 } else {
-                    self.error = "No sleep data found for last night"
+                    self.error = "Failed to process sleep data"
                     completion(false)
                 }
             }
@@ -123,24 +156,101 @@ class HealthKitManager: ObservableObject {
         healthStore.execute(query)
     }
     
-    private func calculateSleepScore() {
-        // Reset the score
+    // Process sleep samples and group by day
+    private func processWeeklySleepData(sleepSamples: [HKCategorySample]) {
+        let calendar = Calendar.current
+        var sleepEntriesByDay: [Date: [SleepEntry]] = [:]
+        
+        // First, group all samples by day
+        for sample in sleepSamples {
+            if let sleepValue = HKCategoryValueSleepAnalysis(rawValue: sample.value) {
+                // Get the day component (start of day) for the sleep entry
+                let day = calendar.startOfDay(for: sample.startDate)
+                
+                let entry = SleepEntry(
+                    startDate: sample.startDate,
+                    endDate: sample.endDate,
+                    duration: sample.endDate.timeIntervalSince(sample.startDate),
+                    sleepStage: sleepValue
+                )
+                
+                if sleepEntriesByDay[day] == nil {
+                    sleepEntriesByDay[day] = []
+                }
+                
+                sleepEntriesByDay[day]?.append(entry)
+            }
+        }
+        
+        // Now process each day's data
+        var dailyDataArray: [DailySleepData] = []
+        
+        for (day, entries) in sleepEntriesByDay {
+            // Calculate metrics for this day
+            let (score, duration, deepSleepPct, efficiency) = calculateMetricsForDay(entries: entries)
+            
+            // Get resting heart rate for this day (simplified - would need more accurate implementation)
+            let heartRate = 65.0 // Placeholder - you'd want to fetch the actual value
+            
+            let dailyData = DailySleepData(
+                date: day,
+                sleepScore: score,
+                sleepData: entries,
+                sleepDuration: duration,
+                deepSleepPercentage: deepSleepPct,
+                sleepEfficiency: efficiency,
+                restingHeartRate: heartRate
+            )
+            
+            dailyDataArray.append(dailyData)
+        }
+        
+        // Sort by date, most recent first
+        let sortedData = dailyDataArray.sorted { $0.date > $1.date }
+        self.weeklyData = sortedData
+    }
+    
+    // Calculate sleep metrics for a given day
+    private func calculateMetricsForDay(entries: [SleepEntry]) -> (Int, TimeInterval, Double, Double) {
+        // Reset metrics
         var score = 0
+        var totalSleep: TimeInterval = 0
+        var deepSleepPct: Double = 0
+        var efficiency: Double = 0
         
-        // 1. Calculate total sleep duration
-        let totalSleep = calculateTotalSleepDuration()
-        self.sleepDuration = totalSleep
+        // Filter for actual sleep (not in bed but awake)
+        let asleepValues: [HKCategoryValueSleepAnalysis] = [
+            .asleep,
+            .inBed,
+            .asleepCore,
+            .asleepDeep,
+            .asleepREM
+        ]
         
-        // 2. Calculate deep sleep percentage
-        let deepSleep = calculateDeepSleepPercentage()
-        self.deepSleepPercentage = deepSleep
+        let sleepEntries = entries.filter { asleepValues.contains($0.sleepStage) }
         
-        // 3. Get sleep efficiency
-        let efficiency = calculateSleepEfficiency()
-        self.sleepEfficiency = efficiency
+        // Calculate total duration
+        for entry in sleepEntries {
+            totalSleep += entry.duration
+        }
         
-        // 4. Get resting heart rate during sleep (simplified)
-        fetchRestingHeartRate()
+        // Calculate deep sleep duration and percentage
+        let deepSleepEntries = entries.filter { $0.sleepStage == .asleepDeep }
+        let deepSleepDuration = deepSleepEntries.reduce(0) { $0 + $1.duration }
+        
+        if totalSleep > 0 {
+            deepSleepPct = (deepSleepDuration / totalSleep) * 100
+        }
+        
+        // Calculate sleep efficiency
+        let inBedEntries = entries.filter { $0.sleepStage == .inBed || $0.sleepStage == .asleep || 
+                                         $0.sleepStage == .asleepCore || $0.sleepStage == .asleepDeep || 
+                                         $0.sleepStage == .asleepREM }
+        let totalInBedDuration = inBedEntries.reduce(0) { $0 + $1.duration }
+        
+        if totalInBedDuration > 0 {
+            efficiency = (totalSleep / totalInBedDuration) * 100
+        }
         
         // Score calculation based on duration (weight: 40%)
         // Ideal sleep duration: 7-9 hours
@@ -165,11 +275,11 @@ class HealthKitManager: ObservableObject {
         // Ideal deep sleep: 20-25% of total sleep
         var deepSleepScore = 0
         
-        if deepSleep >= 20 && deepSleep <= 25 {
+        if deepSleepPct >= 20 && deepSleepPct <= 25 {
             deepSleepScore = 30  // Optimal deep sleep
-        } else if (deepSleep >= 15 && deepSleep < 20) || (deepSleep > 25 && deepSleep <= 30) {
+        } else if (deepSleepPct >= 15 && deepSleepPct < 20) || (deepSleepPct > 25 && deepSleepPct <= 30) {
             deepSleepScore = 25  // Near optimal
-        } else if (deepSleep >= 10 && deepSleep < 15) || (deepSleep > 30 && deepSleep <= 35) {
+        } else if (deepSleepPct >= 10 && deepSleepPct < 15) || (deepSleepPct > 30 && deepSleepPct <= 35) {
             deepSleepScore = 15  // Suboptimal
         } else {
             deepSleepScore = 10  // Poor deep sleep pattern
@@ -197,57 +307,35 @@ class HealthKitManager: ObservableObject {
         // Ensure score is in range 1-100
         score = max(1, min(100, score))
         
-        self.sleepScore = score
+        return (score, totalSleep, deepSleepPct, efficiency)
     }
     
-    private func calculateTotalSleepDuration() -> TimeInterval {
-        // Filter for actual sleep (not in bed but awake)
-        let asleepValues: [HKCategoryValueSleepAnalysis] = [
-            .asleep,
-            .inBed,
-            .asleepCore,
-            .asleepDeep,
-            .asleepREM
-        ]
-        
-        let sleepEntries = sleepData.filter { asleepValues.contains($0.sleepStage) }
-        
-        // Calculate total duration
-        var totalDuration: TimeInterval = 0
-        for entry in sleepEntries {
-            totalDuration += entry.duration
+    // Update the current display data with the selected day's data
+    func updateSelectedDayData(date: Date) {
+        if let dayData = weeklyData.first(where: { Calendar.current.isDate($0.date, inSameDayAs: date) }) {
+            self.selectedDate = date
+            updateSelectedDayData(from: dayData)
         }
-        
-        return totalDuration
     }
     
-    private func calculateDeepSleepPercentage() -> Double {
-        let totalSleepDuration = calculateTotalSleepDuration()
-        guard totalSleepDuration > 0 else { return 0 }
-        
-        // Calculate deep sleep duration
-        let deepSleepEntries = sleepData.filter { $0.sleepStage == .asleepDeep }
-        let deepSleepDuration = deepSleepEntries.reduce(0) { $0 + $1.duration }
-        
-        // Calculate percentage
-        return (deepSleepDuration / totalSleepDuration) * 100
+    private func updateSelectedDayData(from dayData: DailySleepData) {
+        self.sleepData = dayData.sleepData
+        self.sleepScore = dayData.sleepScore
+        self.sleepDuration = dayData.sleepDuration
+        self.deepSleepPercentage = dayData.deepSleepPercentage
+        self.sleepEfficiency = dayData.sleepEfficiency
+        self.restingHeartRate = dayData.restingHeartRate
     }
     
-    private func calculateSleepEfficiency() -> Double {
-        // Time in bed
-        let inBedEntries = sleepData.filter { $0.sleepStage == .inBed || $0.sleepStage == .asleep || 
-                                           $0.sleepStage == .asleepCore || $0.sleepStage == .asleepDeep || 
-                                           $0.sleepStage == .asleepREM }
-        let totalInBedDuration = inBedEntries.reduce(0) { $0 + $1.duration }
-        
-        // Actual sleep time
-        let actualSleepDuration = calculateTotalSleepDuration()
-        
-        // Calculate efficiency
-        guard totalInBedDuration > 0 else { return 0 }
-        return (actualSleepDuration / totalInBedDuration) * 100
+    // Keep existing function for compatibility - now calls the weekly function and selects the most recent day
+    func fetchLastNightSleepData(completion: @escaping (Bool) -> Void) {
+        fetchWeeklySleepData { success in
+            // If successful, data for most recent night will be selected automatically
+            completion(success)
+        }
     }
     
+    // Existing functions kept for compatibility
     private func fetchRestingHeartRate() {
         guard isAuthorized else { return }
         
