@@ -109,10 +109,11 @@ struct ContentView: View {
                     .foregroundColor(.secondary)
                     .padding()
             } else {
-                // Weekly chart
-                ScrollView(.horizontal, showsIndicators: false) {
+                // Weekly chart in grid layout (4 in top row, 3 in bottom row)
+                VStack(spacing: 15) {
+                    // First row (4 days)
                     HStack(spacing: 15) {
-                        ForEach(healthKitManager.weeklyData) { day in
+                        ForEach(Array(healthKitManager.weeklyData.prefix(4))) { day in
                             DaySleepCard(day: day, isSelected: Calendar.current.isDate(day.date, inSameDayAs: healthKitManager.selectedDate))
                                 .onTapGesture {
                                     healthKitManager.updateSelectedDayData(date: day.date)
@@ -120,11 +121,34 @@ struct ContentView: View {
                                         showingWeeklyView = false
                                     }
                                 }
+                                .frame(maxWidth: .infinity)
                         }
                     }
-                    .padding(.horizontal)
+                    
+                    // Second row (3 days)
+                    HStack(spacing: 15) {
+                        ForEach(Array(healthKitManager.weeklyData.suffix(from: min(4, healthKitManager.weeklyData.count)))) { day in
+                            DaySleepCard(day: day, isSelected: Calendar.current.isDate(day.date, inSameDayAs: healthKitManager.selectedDate))
+                                .onTapGesture {
+                                    healthKitManager.updateSelectedDayData(date: day.date)
+                                    withAnimation {
+                                        showingWeeklyView = false
+                                    }
+                                }
+                                .frame(maxWidth: .infinity)
+                        }
+                        
+                        // Add spacers for the empty slots in the second row to maintain layout
+                        if healthKitManager.weeklyData.count > 4 {
+                            let emptySlots = max(0, 7 - healthKitManager.weeklyData.count)
+                            ForEach(0..<emptySlots, id: \.self) { _ in
+                                Spacer()
+                                    .frame(maxWidth: .infinity)
+                            }
+                        }
+                    }
                 }
-                .frame(height: 200)
+                .padding(.horizontal)
                 
                 // Summary statistics
                 WeeklySummaryView(weeklyData: healthKitManager.weeklyData)
@@ -321,7 +345,7 @@ struct DaySleepCard: View {
             RoundedRectangle(cornerRadius: 10)
                 .stroke(isSelected ? Color.blue : Color.clear, lineWidth: 2)
         )
-        .frame(width: 70)
+        .frame(minWidth: 70)
     }
     
     private func scoreColor(_ score: Int) -> Color {
