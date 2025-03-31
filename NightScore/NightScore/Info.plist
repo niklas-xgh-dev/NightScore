@@ -20,7 +20,14 @@
     
     <!-- UI requirements -->
     <key>UILaunchScreen</key>
-    <dict/>
+    <dict>
+        <key>UIImageName</key>
+        <string>AppLogo</string>
+        <key>UIImageRespectsSafeAreaInsets</key>
+        <true/>
+        <key>UIColorName</key>
+        <string>LaunchBackgroundColor</string>
+    </dict>
     <key>UIApplicationSceneManifest</key>
     <dict>
         <key>UIApplicationSupportsMultipleScenes</key>

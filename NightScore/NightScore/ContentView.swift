@@ -18,9 +18,10 @@ struct ContentView: View {
                         .padding()
                 } else if !healthKitManager.isAuthorized {
                     VStack(spacing: 20) {
-                        Image(systemName: "bed.double.fill")
-                            .font(.system(size: 80))
-                            .foregroundColor(.blue)
+                        Image("AppLogo")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 120, height: 120)
                         
                         Text("NightScore needs access to your Health data")
                             .font(.title2)
@@ -100,7 +101,7 @@ struct ContentView: View {
     // Weekly overview showing last 7 days
     var weeklyView: some View {
         VStack {
-            Text("8-Day Sleep Overview")
+            Text("7-Day Sleep Overview")
                 .font(.headline)
                 .padding(.top)
             
