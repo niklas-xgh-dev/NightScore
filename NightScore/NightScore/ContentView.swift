@@ -100,7 +100,7 @@ struct ContentView: View {
     // Weekly overview showing last 7 days
     var weeklyView: some View {
         VStack {
-            Text("7-Day Sleep Overview")
+            Text("8-Day Sleep Overview")
                 .font(.headline)
                 .padding(.top)
             
