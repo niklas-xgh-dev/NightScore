@@ -61,14 +61,11 @@ struct ContentView: View {
                     }
                     
                     if showingWeeklyView {
-                        // Weekly overview
                         weeklyView
                     } else {
-                        // Daily detail view
                         dailyView
                     }
                     
-                    // Refresh button
                     Button("Update Sleep Data") {
                         fetchSleepData()
                     }
@@ -139,7 +136,7 @@ struct ContentView: View {
                                 .frame(maxWidth: .infinity)
                         }
                         
-                        // Add spacers for the empty slots in the second row to maintain layout
+                        // Add spacers for the empty slots in the second row
                         if healthKitManager.weeklyData.count > 4 {
                             let emptySlots = max(0, 7 - healthKitManager.weeklyData.count)
                             ForEach(0..<emptySlots, id: \.self) { _ in
@@ -157,7 +154,7 @@ struct ContentView: View {
         }
     }
     
-    // Daily detail view (similar to original design)
+    // Daily detail view
     var dailyView: some View {
         VStack {
             // Date header
@@ -224,6 +221,13 @@ struct ContentView: View {
                 icon: "clock.fill",
                 title: "Sleep Duration",
                 value: formatDuration(healthKitManager.sleepDuration)
+            )
+            
+            // Awake in Bed time
+            DetailRow(
+                icon: "bed.double.fill",
+                title: "Awake in Bed",
+                value: formatDuration(healthKitManager.awakeInBedTime)
             )
             
             DetailRow(
@@ -394,6 +398,13 @@ struct WeeklySummaryView: View {
                         title: "Avg. Duration", 
                         value: formatDuration(averageSleepDuration)
                     )
+                    
+                    // Add awake in bed time to weekly summary
+                    SummaryItem(
+                        icon: "bed.double.fill",
+                        title: "Avg. Awake Time",
+                        value: formatDuration(averageAwakeTime)
+                    )
                 }
                 
                 VStack(alignment: .leading) {
@@ -418,25 +429,31 @@ struct WeeklySummaryView: View {
     
     private var averageSleepScore: Double {
         guard !weeklyData.isEmpty else { return 0 }
-        let sum = weeklyData.reduce(0) { $0 + Double($1.sleepScore) }
+        let sum = weeklyData.reduce(0, { $0 + Double($1.sleepScore) })
         return sum / Double(weeklyData.count)
     }
     
     private var averageSleepDuration: TimeInterval {
         guard !weeklyData.isEmpty else { return 0 }
-        let sum = weeklyData.reduce(0) { $0 + $1.sleepDuration }
+        let sum = weeklyData.reduce(0, { $0 + $1.sleepDuration })
+        return sum / Double(weeklyData.count)
+    }
+    
+    private var averageAwakeTime: TimeInterval {
+        guard !weeklyData.isEmpty else { return 0 }
+        let sum = weeklyData.reduce(0, { $0 + $1.awakeInBedTime })
         return sum / Double(weeklyData.count)
     }
     
     private var averageDeepSleep: Double {
         guard !weeklyData.isEmpty else { return 0 }
-        let sum = weeklyData.reduce(0) { $0 + $1.deepSleepPercentage }
+        let sum = weeklyData.reduce(0, { $0 + $1.deepSleepPercentage })
         return sum / Double(weeklyData.count)
     }
     
     private var averageEfficiency: Double {
         guard !weeklyData.isEmpty else { return 0 }
-        let sum = weeklyData.reduce(0) { $0 + $1.sleepEfficiency }
+        let sum = weeklyData.reduce(0, { $0 + $1.sleepEfficiency })
         return sum / Double(weeklyData.count)
     }
     
