@@ -6,6 +6,7 @@ class HealthKitManager: ObservableObject {
     @Published var isAuthorized: Bool = false
     @Published var sleepScore: Int = 0
     @Published var sleepDuration: TimeInterval = 0
+    @Published var deepSleepDuration: TimeInterval = 0
     @Published var deepSleepPercentage: Double = 0
     @Published var restingHeartRate: Double = 0
     @Published var sleepEfficiency: Double = 0
@@ -32,6 +33,7 @@ class HealthKitManager: ObservableObject {
         let sleepScore: Int
         let sleepData: [SleepEntry]
         let sleepDuration: TimeInterval
+        let deepSleepDuration: TimeInterval
         let deepSleepPercentage: Double
         let sleepEfficiency: Double
         let restingHeartRate: Double
@@ -159,7 +161,7 @@ class HealthKitManager: ObservableObject {
         var dailyDataArray: [DailySleepData] = []
         
         for (day, entries) in sleepEntriesByDay {
-            let (score, duration, deepSleepPct, efficiency, awakeTime) = calculateMetricsForDay(entries: entries)
+            let (score, duration, deepSleepPct, efficiency, awakeTime, deepSleepDuration) = calculateMetricsForDay(entries: entries)
             
             // Get resting heart rate for this day (simplified implementation)
             let heartRate = 65.0
@@ -169,6 +171,7 @@ class HealthKitManager: ObservableObject {
                 sleepScore: score,
                 sleepData: entries,
                 sleepDuration: duration,
+                deepSleepDuration: deepSleepDuration,
                 deepSleepPercentage: deepSleepPct,
                 sleepEfficiency: efficiency,
                 restingHeartRate: heartRate,
@@ -182,12 +185,13 @@ class HealthKitManager: ObservableObject {
         self.weeklyData = dailyDataArray.sorted { $0.date > $1.date }
     }
     
-    private func calculateMetricsForDay(entries: [SleepEntry]) -> (Int, TimeInterval, Double, Double, TimeInterval) {
+    private func calculateMetricsForDay(entries: [SleepEntry]) -> (Int, TimeInterval, Double, Double, TimeInterval, TimeInterval) {
         // Reset metrics
         var score = 0
         var totalSleep: TimeInterval = 0
         var totalInBed: TimeInterval = 0
         var awakeTime: TimeInterval = 0
+        var deepSleepDuration: TimeInterval = 0
         var deepSleepPct: Double = 0
         var efficiency: Double = 0
         
@@ -211,9 +215,9 @@ class HealthKitManager: ObservableObject {
         // Calculate total in-bed time
         totalInBed = totalSleep + awakeTime
         
-        // Calculate deep sleep percentage
+        // Calculate deep sleep duration and percentage
         let deepSleepEntries = entries.filter { $0.sleepStage == .asleepDeep }
-        let deepSleepDuration = deepSleepEntries.reduce(0, { $0 + $1.duration })
+        deepSleepDuration = deepSleepEntries.reduce(0, { $0 + $1.duration })
         
         if totalSleep > 0 {
             deepSleepPct = (deepSleepDuration / totalSleep) * 100
@@ -276,7 +280,7 @@ class HealthKitManager: ObservableObject {
         // Ensure score is in range 1-100
         score = max(1, min(100, score))
         
-        return (score, totalSleep, deepSleepPct, efficiency, awakeTime)
+        return (score, totalSleep, deepSleepPct, efficiency, awakeTime, deepSleepDuration)
     }
     
     func updateSelectedDayData(date: Date) {
@@ -290,6 +294,7 @@ class HealthKitManager: ObservableObject {
         self.sleepData = dayData.sleepData
         self.sleepScore = dayData.sleepScore
         self.sleepDuration = dayData.sleepDuration
+        self.deepSleepDuration = dayData.deepSleepDuration
         self.deepSleepPercentage = dayData.deepSleepPercentage
         self.sleepEfficiency = dayData.sleepEfficiency
         self.restingHeartRate = dayData.restingHeartRate

@@ -109,9 +109,9 @@ struct ContentView: View {
             } else {
                 // Weekly chart in grid layout (4 in top row, 3 in bottom row)
                 VStack(spacing: 15) {
-                    // First row (4 days)
+                    // First row (3 days)
                     HStack(spacing: 15) {
-                        ForEach(Array(healthKitManager.weeklyData.prefix(4))) { day in
+                        ForEach(Array(healthKitManager.weeklyData.prefix(3))) { day in
                             DaySleepCard(day: day, isSelected: Calendar.current.isDate(day.date, inSameDayAs: healthKitManager.selectedDate))
                                 .onTapGesture {
                                     healthKitManager.updateSelectedDayData(date: day.date)
@@ -123,9 +123,9 @@ struct ContentView: View {
                         }
                     }
                     
-                    // Second row (3 days)
+                    // Second row (4 days)
                     HStack(spacing: 15) {
-                        ForEach(Array(healthKitManager.weeklyData.suffix(from: min(4, healthKitManager.weeklyData.count)))) { day in
+                        ForEach(Array(healthKitManager.weeklyData.suffix(from: min(3, healthKitManager.weeklyData.count)))) { day in
                             DaySleepCard(day: day, isSelected: Calendar.current.isDate(day.date, inSameDayAs: healthKitManager.selectedDate))
                                 .onTapGesture {
                                     healthKitManager.updateSelectedDayData(date: day.date)
@@ -137,7 +137,7 @@ struct ContentView: View {
                         }
                         
                         // Add spacers for the empty slots in the second row
-                        if healthKitManager.weeklyData.count > 4 {
+                        if healthKitManager.weeklyData.count > 3 {
                             let emptySlots = max(0, 7 - healthKitManager.weeklyData.count)
                             ForEach(0..<emptySlots, id: \.self) { _ in
                                 Spacer()
@@ -233,7 +233,7 @@ struct ContentView: View {
             DetailRow(
                 icon: "waveform.path.ecg",
                 title: "Deep Sleep",
-                value: String(format: "%.1f%%", healthKitManager.deepSleepPercentage)
+                value: formatDuration(healthKitManager.deepSleepDuration)
             )
             
             DetailRow(
@@ -411,7 +411,7 @@ struct WeeklySummaryView: View {
                     SummaryItem(
                         icon: "waveform.path.ecg", 
                         title: "Avg. Deep Sleep", 
-                        value: String(format: "%.1f%%", averageDeepSleep)
+                        value: formatDuration(averageDeepSleep)
                     )
                     
                     SummaryItem(
@@ -445,9 +445,9 @@ struct WeeklySummaryView: View {
         return sum / Double(weeklyData.count)
     }
     
-    private var averageDeepSleep: Double {
+    private var averageDeepSleep: TimeInterval {
         guard !weeklyData.isEmpty else { return 0 }
-        let sum = weeklyData.reduce(0, { $0 + $1.deepSleepPercentage })
+        let sum = weeklyData.reduce(0, { $0 + $1.deepSleepDuration })
         return sum / Double(weeklyData.count)
     }
     
