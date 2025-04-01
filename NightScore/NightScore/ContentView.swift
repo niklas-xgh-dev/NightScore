@@ -386,41 +386,20 @@ struct WeeklySummaryView: View {
                 .padding(.bottom, 5)
             
             HStack(spacing: 30) {
-                VStack(alignment: .leading) {
-                    SummaryItem(
-                        icon: "star.fill", 
-                        title: "Average Score", 
-                        value: String(format: "%.0f", averageSleepScore)
-                    )
-                    
-                    SummaryItem(
-                        icon: "clock.fill", 
-                        title: "Avg. Duration", 
-                        value: formatDuration(averageSleepDuration)
-                    )
-                    
-                    // Add awake in bed time to weekly summary
-                    SummaryItem(
-                        icon: "bed.double.fill",
-                        title: "Avg. Awake Time",
-                        value: formatDuration(averageAwakeTime)
-                    )
-                }
+                // Simplified to only show average score and duration
+                SummaryItem(
+                    icon: "star.fill", 
+                    title: "Average Score", 
+                    value: String(format: "%.0f", averageSleepScore)
+                )
                 
-                VStack(alignment: .leading) {
-                    SummaryItem(
-                        icon: "waveform.path.ecg", 
-                        title: "Avg. Deep Sleep", 
-                        value: formatDuration(averageDeepSleep)
-                    )
-                    
-                    SummaryItem(
-                        icon: "chart.bar.fill", 
-                        title: "Avg. Efficiency", 
-                        value: String(format: "%.1f%%", averageEfficiency)
-                    )
-                }
+                SummaryItem(
+                    icon: "clock.fill", 
+                    title: "Avg. Duration", 
+                    value: formatDuration(averageSleepDuration)
+                )
             }
+            .padding(.horizontal)
         }
         .padding()
         .background(Color(.systemGray6))
@@ -436,24 +415,6 @@ struct WeeklySummaryView: View {
     private var averageSleepDuration: TimeInterval {
         guard !weeklyData.isEmpty else { return 0 }
         let sum = weeklyData.reduce(0, { $0 + $1.sleepDuration })
-        return sum / Double(weeklyData.count)
-    }
-    
-    private var averageAwakeTime: TimeInterval {
-        guard !weeklyData.isEmpty else { return 0 }
-        let sum = weeklyData.reduce(0, { $0 + $1.awakeInBedTime })
-        return sum / Double(weeklyData.count)
-    }
-    
-    private var averageDeepSleep: TimeInterval {
-        guard !weeklyData.isEmpty else { return 0 }
-        let sum = weeklyData.reduce(0, { $0 + $1.deepSleepDuration })
-        return sum / Double(weeklyData.count)
-    }
-    
-    private var averageEfficiency: Double {
-        guard !weeklyData.isEmpty else { return 0 }
-        let sum = weeklyData.reduce(0, { $0 + $1.sleepEfficiency })
         return sum / Double(weeklyData.count)
     }
     
