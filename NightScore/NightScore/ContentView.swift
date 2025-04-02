@@ -8,91 +8,113 @@ struct ContentView: View {
     @State private var showingWeeklyView: Bool = true
     
     var body: some View {
-        NavigationView {
-            VStack {
-                if isLoading {
-                    ProgressView()
-                        .scaleEffect(2)
-                        .padding()
-                    Text("Analyzing your sleep data...")
-                        .padding()
-                } else if !healthKitManager.isAuthorized {
-                    VStack(spacing: 20) {
-                        Image("AppLogo")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 120, height: 120)
-                        
-                        Text("NightScore needs access to your Health data")
-                            .font(.title2)
-                            .multilineTextAlignment(.center)
-                        
-                        Text("This app uses your sleep data to calculate a sleep quality score.")
-                            .multilineTextAlignment(.center)
-                            .foregroundColor(.secondary)
-                            .padding(.horizontal)
-                        
-                        Button("Authorize HealthKit Access") {
-                            requestHealthKitAuthorization()
-                        }
-                        .padding()
-                        .background(Color.blue)
-                        .foregroundColor(.white)
-                        .cornerRadius(10)
+        VStack(spacing: 0) {
+            // Custom header with centered title and toggle
+            HStack {
+                Spacer()
+                Text("NightScore")
+                    .font(.headline)
+                    .foregroundColor(.secondary)
+                Spacer()
+                
+                // Toggle button for weekly/daily view
+                Button(action: {
+                    withAnimation {
+                        showingWeeklyView.toggle()
                     }
-                    .padding()
-                } else {
-                    // Toggle button for weekly/daily view
-                    HStack {
-                        Spacer()
-                        Button(action: {
-                            withAnimation {
-                                showingWeeklyView.toggle()
-                            }
-                        }) {
-                            Text(showingWeeklyView ? "Daily View" : "Weekly View")
-                                .font(.subheadline)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(Color.blue.opacity(0.1))
-                                .cornerRadius(8)
-                        }
-                        .padding(.trailing)
-                    }
-                    
-                    if showingWeeklyView {
-                        weeklyView
-                    } else {
-                        dailyView
-                    }
-                    
-                    Button("Update Sleep Data") {
-                        fetchSleepData()
-                    }
-                    .padding()
-                    .background(Color.blue)
-                    .foregroundColor(.white)
-                    .cornerRadius(10)
-                    .padding(.top, 10)
+                }) {
+                    Text(showingWeeklyView ? "Daily View" : "Weekly View")
+                        .font(.subheadline)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.blue.opacity(0.1))
+                        .cornerRadius(8)
                 }
+            }
+            .padding(.horizontal)
+            .padding(.top, 8)
+            .padding(.bottom, 8)
+            
+            // Main content
+            if isLoading {
+                Spacer()
+                ProgressView()
+                    .scaleEffect(2)
+                    .padding()
+                Text("Analyzing your sleep data...")
+                    .padding()
+                Spacer()
+            } else if !healthKitManager.isAuthorized {
+                authorizationView
+            } else {
+                ScrollView {
+                    VStack {
+                        if showingWeeklyView {
+                            weeklyView
+                            
+                            // Update button only in weekly view
+                            Button("Update Sleep Data") {
+                                fetchSleepData()
+                            }
+                            .padding()
+                            .background(Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(10)
+                            .padding(.top, 10)
+                        } else {
+                            dailyView
+                        }
+                    }
+                    .padding()
+                }
+            }
+        }
+        .onAppear {
+            if !healthKitManager.isAuthorized {
+                requestHealthKitAuthorization()
+            } else {
+                fetchSleepData()
+            }
+        }
+        .alert(isPresented: $showError) {
+            Alert(
+                title: Text("Error"),
+                message: Text(healthKitManager.error ?? "An unknown error occurred"),
+                dismissButton: .default(Text("OK"))
+            )
+        }
+    }
+    
+    // Authorization view
+    var authorizationView: some View {
+        VStack(spacing: 20) {
+            Spacer()
+            
+            Image("AppLogo")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 120, height: 120)
+            
+            Text("NightScore needs access to your Health data")
+                .font(.title2)
+                .multilineTextAlignment(.center)
+            
+            Text("This app uses your sleep data to calculate a sleep quality score.")
+                .multilineTextAlignment(.center)
+                .foregroundColor(.secondary)
+                .padding(.horizontal)
+            
+            Button("Authorize HealthKit Access") {
+                requestHealthKitAuthorization()
             }
             .padding()
-            .onAppear {
-                if !healthKitManager.isAuthorized {
-                    requestHealthKitAuthorization()
-                } else {
-                    fetchSleepData()
-                }
-            }
-            .alert(isPresented: $showError) {
-                Alert(
-                    title: Text("Error"),
-                    message: Text(healthKitManager.error ?? "An unknown error occurred"),
-                    dismissButton: .default(Text("OK"))
-                )
-            }
-            .navigationTitle("NightScore")
+            .background(Color.blue)
+            .foregroundColor(.white)
+            .cornerRadius(10)
+            
+            Spacer()
         }
+        .padding()
     }
     
     // Weekly overview showing last 7 days
