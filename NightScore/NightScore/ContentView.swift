@@ -9,12 +9,13 @@ struct ContentView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Custom header with centered title and toggle
+            // Custom header with left-aligned title and toggle
             HStack {
-                Spacer()
                 Text("NightScore")
-                    .font(.headline)
+                    .font(.title3)
+                    .fontWeight(.medium)
                     .foregroundColor(.secondary)
+                
                 Spacer()
                 
                 // Toggle button for weekly/daily view
@@ -350,12 +351,13 @@ struct DaySleepCard: View {
                     .font(.system(size: 20, weight: .bold))
             }
             
-            // Day of week and date
+            // Day of week
             Text(day.dayOfWeek)
                 .font(.caption)
                 .fontWeight(.medium)
             
-            Text(day.dayNumber)
+            // Date label - more descriptive now
+            Text(getDateLabel(date: day.date))
                 .font(.caption2)
                 .foregroundColor(.secondary)
             
@@ -373,6 +375,20 @@ struct DaySleepCard: View {
                 .stroke(isSelected ? Color.blue : Color.clear, lineWidth: 2)
         )
         .frame(minWidth: 70)
+    }
+    
+    private func getDateLabel(date: Date) -> String {
+        let calendar = Calendar.current
+        
+        // Check if this is today's date
+        if calendar.isDateInToday(date) {
+            return "Last Night"
+        }
+        
+        // For other dates, show with format like "1 Apr" or "31 Mar"
+        let formatter = DateFormatter()
+        formatter.dateFormat = "d MMM"
+        return formatter.string(from: date)
     }
     
     private func scoreColor(_ score: Int) -> Color {
@@ -407,8 +423,8 @@ struct WeeklySummaryView: View {
                 .font(.headline)
                 .padding(.bottom, 5)
             
+            // First row of stats
             HStack(spacing: 30) {
-                // Simplified to only show average score and duration
                 SummaryItem(
                     icon: "star.fill", 
                     title: "Average Score", 
@@ -422,6 +438,23 @@ struct WeeklySummaryView: View {
                 )
             }
             .padding(.horizontal)
+            
+            // Second row of stats
+            HStack(spacing: 30) {
+                SummaryItem(
+                    icon: "waveform.path.ecg", 
+                    title: "Avg. Deep Sleep", 
+                    value: formatDuration(averageDeepSleepDuration)
+                )
+                
+                SummaryItem(
+                    icon: "heart.fill", 
+                    title: "Avg. Heart Rate", 
+                    value: String(format: "%.0f bpm", averageHeartRate)
+                )
+            }
+            .padding(.horizontal)
+            .padding(.top, 8)
         }
         .padding()
         .background(Color(.systemGray6))
@@ -438,6 +471,20 @@ struct WeeklySummaryView: View {
         guard !weeklyData.isEmpty else { return 0 }
         let sum = weeklyData.reduce(0, { $0 + $1.sleepDuration })
         return sum / Double(weeklyData.count)
+    }
+    
+    private var averageDeepSleepDuration: TimeInterval {
+        guard !weeklyData.isEmpty else { return 0 }
+        let sum = weeklyData.reduce(0, { $0 + $1.deepSleepDuration })
+        return sum / Double(weeklyData.count)
+    }
+    
+    private var averageHeartRate: Double {
+        guard !weeklyData.isEmpty else { return 0 }
+        let validHeartRates = weeklyData.filter { $0.restingHeartRate > 0 }
+        guard !validHeartRates.isEmpty else { return 0 }
+        let sum = validHeartRates.reduce(0, { $0 + $1.restingHeartRate })
+        return sum / Double(validHeartRates.count)
     }
     
     private func formatDuration(_ interval: TimeInterval) -> String {

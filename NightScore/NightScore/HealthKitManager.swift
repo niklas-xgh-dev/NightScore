@@ -223,59 +223,46 @@ class HealthKitManager: ObservableObject {
             deepSleepPct = (deepSleepDuration / totalSleep) * 100
         }
         
-        // Fix: Calculate sleep efficiency properly
+        // Calculate sleep efficiency (still tracking it even though it's not used for scoring)
         if totalInBed > 0 {
             efficiency = (totalSleep / totalInBed) * 100
         }
         
-        // Score calculation based on duration (weight: 40%)
+        // UPDATED SCORING SYSTEM
+        
+        // 1. Sleep Duration Score (50% of total, 50 points maximum)
         let durationHours = totalSleep / 3600
         var durationScore = 0
         
-        if durationHours >= 7 && durationHours <= 9 {
-            durationScore = 40  // Optimal sleep duration
-        } else if durationHours >= 6 && durationHours < 7 {
-            durationScore = 30  // Slightly below optimal
-        } else if durationHours > 9 && durationHours <= 10 {
-            durationScore = 30  // Slightly above optimal
-        } else if durationHours >= 5 && durationHours < 6 {
-            durationScore = 20  // Insufficient sleep
-        } else if durationHours > 10 {
-            durationScore = 20  // Too much sleep
+        if durationHours >= 8 {
+            durationScore = 50  // Full points for 8+ hours
+        } else if durationHours >= 7 {
+            durationScore = 40  // Good score for 7-8 hours
+        } else if durationHours >= 6 {
+            durationScore = 30  // Ok score for 6-7 hours
+        } else if durationHours >= 5 {
+            durationScore = 20  // Lower score for 5-6 hours
         } else {
-            durationScore = 10  // Very insufficient sleep
+            durationScore = 10  // Minimal score for less than 5 hours
         }
         
-        // Deep sleep percentage score (weight: 30%)
+        // 2. Deep Sleep Percentage Score (50% of total, 50 points maximum)
         var deepSleepScore = 0
         
-        if deepSleepPct >= 20 && deepSleepPct <= 25 {
-            deepSleepScore = 30  // Optimal deep sleep
-        } else if (deepSleepPct >= 15 && deepSleepPct < 20) || (deepSleepPct > 25 && deepSleepPct <= 30) {
-            deepSleepScore = 25  // Near optimal
-        } else if (deepSleepPct >= 10 && deepSleepPct < 15) || (deepSleepPct > 30 && deepSleepPct <= 35) {
-            deepSleepScore = 15  // Suboptimal
+        if deepSleepPct >= 12 {
+            deepSleepScore = 50  // Full points for 12%+ deep sleep
+        } else if deepSleepPct >= 10 {
+            deepSleepScore = 40  // Good score for 10-12% deep sleep
+        } else if deepSleepPct >= 8 {
+            deepSleepScore = 30  // Ok score for 8-10% deep sleep
+        } else if deepSleepPct >= 5 {
+            deepSleepScore = 20  // Lower score for 5-8% deep sleep
         } else {
-            deepSleepScore = 10  // Poor deep sleep pattern
+            deepSleepScore = 10  // Minimal score for less than 5% deep sleep
         }
         
-        // Sleep efficiency score (weight: 30%)
-        var efficiencyScore = 0
-        
-        if efficiency >= 90 {
-            efficiencyScore = 30  // Excellent efficiency
-        } else if efficiency >= 85 && efficiency < 90 {
-            efficiencyScore = 25  // Good efficiency
-        } else if efficiency >= 75 && efficiency < 85 {
-            efficiencyScore = 20  // Average efficiency
-        } else if efficiency >= 65 && efficiency < 75 {
-            efficiencyScore = 15  // Below average efficiency
-        } else {
-            efficiencyScore = 10  // Poor efficiency
-        }
-        
-        // Calculate total score
-        score = durationScore + deepSleepScore + efficiencyScore
+        // Calculate total score (just two components now)
+        score = durationScore + deepSleepScore
         
         // Ensure score is in range 1-100
         score = max(1, min(100, score))
