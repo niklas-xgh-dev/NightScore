@@ -10,19 +10,52 @@ struct Provider: TimelineProvider {
     }
 
     func getSnapshot(in context: Context, completion: @escaping (SleepScoreEntry) -> ()) {
+        // First try to load data from shared defaults
+        if let sharedData = SharedDefaults.loadWeeklyData() {
+            let entry = SleepScoreEntry(date: Date(), weeklyData: sharedData)
+            completion(entry)
+            return
+        }
+        
+        // If no shared data or it's stale, use sample data for the snapshot
         let entry = SleepScoreEntry(date: Date(), weeklyData: SleepScoreEntry.sampleData)
         completion(entry)
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> ()) {
+        // First check if we have recent data from the main app
+        if let sharedData = SharedDefaults.loadWeeklyData(),
+           let lastUpdate = SharedDefaults.lastUpdateTime(),
+           Date().timeIntervalSince(lastUpdate) < 3600 { // Less than an hour old
+            
+            let entry = SleepScoreEntry(date: Date(), weeklyData: sharedData)
+            let nextUpdate = Calendar.current.date(byAdding: .hour, value: 1, to: Date()) ?? Date().addingTimeInterval(3600)
+            let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
+            
+            completion(timeline)
+            return
+        }
+        
+        // Otherwise fetch data directly from HealthKit
         healthKitManager.fetchWeeklySleepData { weeklyData in
             let currentDate = Date()
             let entry = SleepScoreEntry(date: currentDate, weeklyData: weeklyData)
             
-            // Update once per day, or when the app is opened
-            let nextUpdateDate = Calendar.current.date(byAdding: .hour, value: 8, to: currentDate)!
-            let timeline = Timeline(entries: [entry], policy: .after(nextUpdateDate))
+            // Update at 4am or in 8 hours, whichever comes first
+            var nextUpdateComponents = DateComponents()
+            nextUpdateComponents.hour = 4
+            nextUpdateComponents.minute = 0
             
+            let calendar = Calendar.current
+            let now = currentDate
+            var nextUpdate = calendar.nextDate(after: now, matching: nextUpdateComponents, matchingPolicy: .nextTime) ?? now.addingTimeInterval(8 * 3600)
+            
+            // If next 4am is more than 8 hours away, update in 8 hours
+            if nextUpdate.timeIntervalSince(now) > 8 * 3600 {
+                nextUpdate = now.addingTimeInterval(8 * 3600)
+            }
+            
+            let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
             completion(timeline)
         }
     }
@@ -30,48 +63,23 @@ struct Provider: TimelineProvider {
 
 struct SleepScoreEntry: TimelineEntry {
     let date: Date
-    let weeklyData: [DailySleepData]
+    let weeklyData: [SharedSleepData]
     
-    static var sampleData: [DailySleepData] {
+    static var sampleData: [SharedSleepData] {
         let calendar = Calendar.current
         let today = Date()
         
         return (0..<7).map { dayOffset in
             guard let date = calendar.date(byAdding: .day, value: -dayOffset, to: today) else {
-                return DailySleepData(date: today, sleepScore: 70, sleepDuration: 25200) // 7 hours
+                return SharedSleepData(date: today, sleepScore: 70, sleepDuration: 25200) // 7 hours
             }
             
             // Create more varied sample data
             let score = [85, 72, 68, 90, 76, 65, 82][dayOffset % 7]
             let duration = Double([7.5, 6.2, 6.8, 8.1, 7.0, 5.5, 7.8][dayOffset % 7]) * 3600
             
-            return DailySleepData(date: date, sleepScore: score, sleepDuration: duration)
+            return SharedSleepData(date: date, sleepScore: score, sleepDuration: duration)
         }
-    }
-}
-
-struct DailySleepData {
-    let date: Date
-    let sleepScore: Int
-    let sleepDuration: TimeInterval
-    
-    var dayNumber: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "d"
-        return formatter.string(from: date)
-    }
-    
-    var dayOfWeek: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "EEE"
-        return formatter.string(from: date)
-    }
-    
-    func formatHours() -> String {
-        let hours = Int(sleepDuration) / 3600
-        let minutes = (Int(sleepDuration) % 3600) / 60
-        
-        return "\(hours)h \(minutes)m"
     }
 }
 
@@ -95,7 +103,7 @@ class HealthKitWidget {
         healthStore.requestAuthorization(toShare: nil, read: typesToRead) { _, _ in }
     }
     
-    func fetchWeeklySleepData(completion: @escaping ([DailySleepData]) -> Void) {
+    func fetchWeeklySleepData(completion: @escaping ([SharedSleepData]) -> Void) {
         guard HKHealthStore.isHealthDataAvailable() else {
             completion([])
             return
@@ -131,7 +139,7 @@ class HealthKitWidget {
         healthStore.execute(query)
     }
     
-    private func processWeeklySleepData(sleepSamples: [HKCategorySample]) -> [DailySleepData] {
+    private func processWeeklySleepData(sleepSamples: [HKCategorySample]) -> [SharedSleepData] {
         let calendar = Calendar.current
         var sleepByDay: [Date: [HKCategorySample]] = [:]
         
@@ -145,12 +153,12 @@ class HealthKitWidget {
             sleepByDay[day]?.append(sample)
         }
         
-        var dailyDataArray: [DailySleepData] = []
+        var dailyDataArray: [SharedSleepData] = []
         
         for (day, samples) in sleepByDay {
             let (score, duration) = calculateMetricsForDay(samples: samples)
             
-            let dailyData = DailySleepData(
+            let dailyData = SharedSleepData(
                 date: day,
                 sleepScore: score,
                 sleepDuration: duration
@@ -179,7 +187,7 @@ class HealthKitWidget {
             }
         }
         
-        // Basic scoring algorithm
+        // Basic scoring algorithm - simplified for the widget
         let durationHours = totalSleep / 3600
         var score = 0
         
@@ -195,7 +203,7 @@ class HealthKitWidget {
             score = 50  // Poor
         }
         
-        // Add some randomness for demo purposes
+        // Add some randomness for variety (you'd remove this in production)
         score += Int.random(in: -5...5)
         score = max(1, min(100, score))
         
@@ -207,10 +215,6 @@ struct NightScoreWidgetEntryView : View {
     var entry: Provider.Entry
     
     var body: some View {
-        mediumWidget
-    }
-    
-    var mediumWidget: some View {
         ZStack {
             Color(UIColor.systemBackground)
             
@@ -292,7 +296,8 @@ struct ScoreCircle: View {
     }
 }
 
-@main
+// IMPORTANT: We're NOT adding the @main attribute here
+// because it already exists in the main app
 struct NightScoreWidget: Widget {
     let kind: String = "NightScoreWidget"
 

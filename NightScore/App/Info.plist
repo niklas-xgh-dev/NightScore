@@ -5,6 +5,8 @@
     <!-- Essential app identifiers -->
     <key>CFBundleIdentifier</key>
     <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+    <key>CFBundleDisplayName</key>
+    <string>NightScore</string>
     <key>CFBundleName</key>
     <string>$(PRODUCT_NAME)</string>
     <key>CFBundleExecutable</key>
@@ -16,30 +18,19 @@
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundlePackageType</key>
-    <string>APPL</string>
+    <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
     
-    <!-- UI requirements -->
-    <key>UILaunchScreen</key>
+    <!-- Widget Extension specific -->
+    <key>NSExtension</key>
     <dict>
-        <key>UIImageName</key>
-        <string>AppLogo</string>
-        <key>UIImageRespectsSafeAreaInsets</key>
-        <true/>
-        <key>UIColorName</key>
-        <string>LaunchBackgroundColor</string>
+        <key>NSExtensionPointIdentifier</key>
+        <string>com.apple.widgetkit-extension</string>
     </dict>
-    <key>UIApplicationSceneManifest</key>
-    <dict>
-        <key>UIApplicationSupportsMultipleScenes</key>
-        <false/>
-    </dict>
-    <key>UIApplicationSupportsIndirectInputEvents</key>
-    <true/>
     
     <!-- HealthKit permissions -->
     <key>NSHealthShareUsageDescription</key>
     <string>NightScore needs access to your sleep data to calculate your sleep quality score.</string>
     <key>NSHealthUpdateUsageDescription</key>
-    <string>NightScore stores your calculated sleep scores in the Health app.</string>
+    <string>NightScore does not modify your health data.</string>
 </dict>
 </plist>
