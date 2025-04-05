@@ -2,6 +2,11 @@
 
 A sleep quality measurement app that analyzes HealthKit sleep data on iOS.
 
+<p align="center">
+  <img src="screenshots/daily_view.png" width="350" alt="Daily View">
+  <img src="screenshots/weekly_view.png" width="350" alt="Weekly View">
+</p>
+
 ## Features
 
 - Accesses HealthKit sleep data
