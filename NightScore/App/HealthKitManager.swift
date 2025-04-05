@@ -1,5 +1,6 @@
 import Foundation
 import HealthKit
+import WidgetKit
 
 class HealthKitManager: ObservableObject {
     @Published var sleepData: [SleepEntry] = []
@@ -124,6 +125,10 @@ class HealthKitManager: ObservableObject {
                         self.selectedDate = latestDay.date
                         self.updateSelectedDayData(from: latestDay)
                     }
+                    
+                    // Save data for widget after processing
+                    self.saveDataForWidget()
+                    
                     completion(true)
                 } else {
                     self.error = "Failed to process sleep data"
@@ -136,6 +141,7 @@ class HealthKitManager: ObservableObject {
     }
     
     private func processWeeklySleepData(sleepSamples: [HKCategorySample]) {
+        // [Your existing implementation]
         let calendar = Calendar.current
         var sleepEntriesByDay: [Date: [SleepEntry]] = [:]
         
@@ -186,6 +192,7 @@ class HealthKitManager: ObservableObject {
     }
     
     private func calculateMetricsForDay(entries: [SleepEntry]) -> (Int, TimeInterval, Double, Double, TimeInterval, TimeInterval) {
+        // [Your existing implementation]
         // Reset metrics
         var score = 0
         var totalSleep: TimeInterval = 0
@@ -290,5 +297,73 @@ class HealthKitManager: ObservableObject {
     
     func fetchLastNightSleepData(completion: @escaping (Bool) -> Void) {
         fetchWeeklySleepData(completion: completion)
+    }
+    
+    // MARK: - Widget Integration (moved from SharedHealthKit.swift)
+    
+    func saveDataForWidget() {
+        // Convert from DailySleepData to SharedSleepData
+        let sharedData = self.weeklyData.map { dayData in
+            SharedSleepData(
+                date: dayData.date,
+                sleepScore: dayData.sleepScore,
+                sleepDuration: dayData.sleepDuration
+            )
+        }
+        
+        // Save to shared defaults
+        SharedDefaults.saveWeeklyData(sharedData)
+        
+        // Request widget refresh
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+}
+
+// MARK: - Shared Data Structures (moved from SharedHealthKit.swift)
+
+// Shared sleep data structure for both app and widget
+struct SharedSleepData: Codable {
+    let date: Date
+    let sleepScore: Int
+    let sleepDuration: TimeInterval
+    
+    var dayOfWeek: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEE"
+        return formatter.string(from: date)
+    }
+    
+    func formatHours() -> String {
+        let hours = Int(sleepDuration) / 3600
+        let minutes = (Int(sleepDuration) % 3600) / 60
+        
+        return "\(hours)h \(minutes)m"
+    }
+}
+
+// Utility for sharing data between app and widget
+class SharedDefaults {
+    static let appGroupIdentifier = "group.com.yourcompany.nightscore"
+    static let defaults = UserDefaults(suiteName: appGroupIdentifier)
+    
+    static func saveWeeklyData(_ data: [SharedSleepData]) {
+        let encoder = JSONEncoder()
+        if let encoded = try? encoder.encode(data) {
+            defaults?.set(encoded, forKey: "weeklyData")
+            defaults?.set(Date(), forKey: "lastUpdate")
+        }
+    }
+    
+    static func loadWeeklyData() -> [SharedSleepData]? {
+        guard let data = defaults?.data(forKey: "weeklyData") else {
+            return nil
+        }
+        
+        let decoder = JSONDecoder()
+        return try? decoder.decode([SharedSleepData].self, from: data)
+    }
+    
+    static func lastUpdateTime() -> Date? {
+        return defaults?.object(forKey: "lastUpdate") as? Date
     }
 }

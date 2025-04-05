@@ -5,7 +5,5 @@ import SwiftUI
 struct NightScoreWidgetBundle: WidgetBundle {
     var body: some Widget {
         NightScoreWidget()
-        NightScoreWidgetControl()
-        NightScoreWidgetLiveActivity()
     }
 }
